@@ -21,7 +21,7 @@ GRANT USAGE ON SCHEMA api TO PUBLIC;
 
 CREATE TABLE core.departments
 (
-    id SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title VARCHAR(200)
 );
 COMMENT ON TABLE core.departments
@@ -30,8 +30,9 @@ IS 'Отделы';
 
 CREATE TABLE core.offices
 (
-    number SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    seats SMALLINT NOT NULL
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    number INT NOT NULL,
+    seats INT NOT NULL
 );
 COMMENT ON TABLE core.offices 
 IS 'Офисы';
@@ -39,7 +40,7 @@ IS 'Офисы';
 
 CREATE TABLE core.roles
 (
-    id SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title VARCHAR(300) NOT NULL,
     salary NUMERIC(10, 2) NOT NULL
 );
@@ -55,10 +56,10 @@ CREATE TABLE core.employees
     middle_name VARCHAR(50),
     date_of_birdth DATE NOT NULL,
     salary NUMERIC(10, 2),
-    fk_boss SMALLINT REFERENCES core.employees(id) ON DELETE SET NULL,
-    fk_department SMALLINT REFERENCES core.departments(id) ON DELETE CASCADE,
-    fk_office SMALLINT REFERENCES core.offices(number) ON DELETE SET NULL,
-    fk_role SMALLINT REFERENCES core.roles(id) ON DELETE CASCADE
+    fk_boss INT REFERENCES core.employees(id) ON DELETE SET NULL,
+    fk_department INT REFERENCES core.departments(id) ON DELETE CASCADE,
+    fk_office INT REFERENCES core.offices(id) ON DELETE SET NULL,
+    fk_role INT REFERENCES core.roles(id) ON DELETE CASCADE
 );
 COMMENT ON TABLE core.employees 
 IS 'Сотрудники';
@@ -81,14 +82,14 @@ IS 'Добавление отдела';
 
 
 CREATE OR REPLACE PROCEDURE api.update_department(
-    input_id SMALLINT,
+    input_id INT,
     input_title VARCHAR(200)
     ) AS $$
     UPDATE core.departments
     SET title = input_title
     WHERE id = input_id;
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.update_department(SMALLINT, VARCHAR(200)) 
+COMMENT ON PROCEDURE api.update_department(INT, VARCHAR(200)) 
 IS 'Изменение названия отдела';
 
 
@@ -104,33 +105,36 @@ IS 'Удаление отдела';
 -- OFFICES
 
 CREATE OR REPLACE PROCEDURE api.create_office(
-    input_seats SMALLINT
+    input_number INT,
+    input_seats INT
     ) AS $$
-    INSERT INTO core.offices(seats)
-    VALUES(input_seats);
+    INSERT INTO core.offices(number, seats)
+    VALUES(input_number, input_seats);
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.create_office(SMALLINT) 
+COMMENT ON PROCEDURE api.create_office(INT, INT) 
 IS 'Добавление офиса';
 
 
 CREATE OR REPLACE PROCEDURE api.update_office(
-    input_number SMALLINT,
-    input_seats SMALLINT
+    input_id INT,
+    input_number INT DEFAULT NULL,
+    input_seats INT DEFAULT NULL
     ) AS $$
     UPDATE core.offices
-    SET seats = input_seats
-    WHERE number = input_number;
+    SET number = COALESCE(input_number, number), 
+        seats = COALESCE(input_seats, seats)
+    WHERE id = input_id;
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.update_office(SMALLINT, SMALLINT) 
+COMMENT ON PROCEDURE api.update_office(INT, INT, INT) 
 IS 'Изменение количества мест в офисе';
 
 
 CREATE OR REPLACE PROCEDURE api.delete_office(
-    input_number SMALLINT
+    input_id INT
     ) AS $$
-    DELETE FROM core.offices WHERE number = input_number;
+    DELETE FROM core.offices WHERE id = input_id;
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.delete_office(SMALLINT) 
+COMMENT ON PROCEDURE api.delete_office(INT) 
 IS 'Удаление офиса';
 
 
@@ -155,7 +159,7 @@ CALL core.update_role(1, 'New Title', NULL);
 Для неизменного параметра нужно ввести NULL. Можно ввести для изменения оба параметра.
 */
 CREATE OR REPLACE PROCEDURE api.update_role(
-    input_id SMALLINT,
+    input_id INT,
     input_title VARCHAR(300) DEFAULT NULL,
     input_salary NUMERIC(10, 2) DEFAULT NULL
     ) AS $$
@@ -170,16 +174,16 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-COMMENT ON PROCEDURE api.update_role(SMALLINT, VARCHAR(300), NUMERIC(10, 2)) 
+COMMENT ON PROCEDURE api.update_role(INT, VARCHAR(300), NUMERIC(10, 2)) 
 IS 'Изменение параметров должности';
 
 
 CREATE OR REPLACE PROCEDURE api.delete_role(
-    input_id SMALLINT
+    input_id INT
     ) AS $$
     DELETE FROM core.roles WHERE id = input_id
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.delete_role(SMALLINT) 
+COMMENT ON PROCEDURE api.delete_role(INT) 
 IS 'Удаление должности';
 
 
@@ -191,10 +195,10 @@ CREATE OR REPLACE PROCEDURE api.create_employee(
     input_middle_name VARCHAR(50),
     input_date_of_birdth DATE,
     input_salary NUMERIC(10, 2),
-    input_boss SMALLINT,
-    input_department SMALLINT,
-    input_office SMALLINT,
-    input_role SMALLINT
+    input_boss INT,
+    input_department INT,
+    input_office INT,
+    input_role INT
     ) AS $$
     INSERT INTO core.employees(first_name, last_name, middle_name, date_of_birdth, salary, 
     fk_boss, fk_department, fk_office, fk_role)
@@ -203,21 +207,21 @@ CREATE OR REPLACE PROCEDURE api.create_employee(
 $$ LANGUAGE sql;
 COMMENT ON PROCEDURE api.create_employee(
     VARCHAR(50), VARCHAR(50), VARCHAR(50), DATE, NUMERIC(10, 2),
-    SMALLINT, SMALLINT, SMALLINT, SMALLINT
+    INT, INT, INT, INT
 ) IS 'Добавление должости';
 
 
 CREATE OR REPLACE PROCEDURE api.update_employee(
-    input_id SMALLINT,
+    input_id INT,
     iinput_first_name VARCHAR(50) DEFAULT NULL,
     input_last_name VARCHAR(50) DEFAULT NULL,
     input_middle_name VARCHAR(50) DEFAULT NULL,
     input_date_of_birdth DATE DEFAULT NULL,
     input_salary NUMERIC(10, 2) DEFAULT NULL,
-    input_boss SMALLINT DEFAULT NULL,
-    input_department SMALLINT DEFAULT NULL,
-    input_office SMALLINT DEFAULT NULL,
-    input_role SMALLINT DEFAULT NULL
+    input_boss INT DEFAULT NULL,
+    input_department INT DEFAULT NULL,
+    input_office INT DEFAULT NULL,
+    input_role INT DEFAULT NULL
     ) AS $$
 BEGIN
     IF input_first_name IS NOT NULL 
@@ -238,8 +242,8 @@ BEGIN
             salary = COALESCE(input_salary, salary),
             fk_boss = COALESCE(input_boss, fk_boss),
             fk_department = COALESCE(input_department, fk_department),
-            fk_office = COALESCE(input_office, office),
-            fk_role =COALESCE(input_role, role)
+            fk_office = COALESCE(input_office, fk_office),
+            fk_role =COALESCE(input_role, fk_role)
         WHERE id = input_id;
     ELSE
         RAISE EXCEPTION 'Необходимо указать хотя бы один параметр (должность или зарплата)';
@@ -247,18 +251,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON PROCEDURE api.update_employee(
-    SMALLINT, VARCHAR(50), VARCHAR(50), VARCHAR(50), DATE, NUMERIC(10, 2),
-    SMALLINT, SMALLINT, SMALLINT, SMALLINT
+    INT, VARCHAR(50), VARCHAR(50), VARCHAR(50), DATE, NUMERIC(10, 2),
+    INT, INT, INT, INT
 ) 
 IS 'Изменение параметров сотрудника';
 
 
 CREATE OR REPLACE PROCEDURE api.delete_employee(
-    input_id SMALLINT
+    input_id INT
     ) AS $$
     DELETE FROM core.employees WHERE id = input_id
 $$ LANGUAGE sql;
-COMMENT ON PROCEDURE api.delete_employee(SMALLINT) 
+COMMENT ON PROCEDURE api.delete_employee(INT) 
 IS 'Удаление сотрудника';
 
 
@@ -345,3 +349,233 @@ FOR EACH ROW
 EXECUTE FUNCTION service.set_remote_work();
 COMMENT ON TRIGGER trg_set_default_salary ON core.employees
 IS 'Проверка наличия свободных мест в офисе при добавлении сотрудника';
+
+
+--
+-- GENERATE DATA
+--
+
+
+CREATE OR REPLACE FUNCTION service.generate_num(limit_num INT) RETURNS INT AS $$
+    SELECT FLOOR(RANDOM() * limit_num) + 1;
+$$ LANGUAGE sql IMMUTABLE;
+COMMENT ON FUNCTION service.generate_num(INT)
+IS 'Генерация случайного целого числа';
+
+
+CREATE OR REPLACE FUNCTION service.generate_boolean_value() RETURNS BOOLEAN AS $$
+    SELECT CASE WHEN random() < 0.5 THEN TRUE ELSE FALSE END;
+$$ LANGUAGE sql IMMUTABLE;
+COMMENT ON FUNCTION service.generate_boolean_value()
+IS 'Генерация булевого значения';
+
+
+-- Генерация данных об отделах
+DO $$
+DECLARE
+    department_list VARCHAR[] := ARRAY[
+        'Система безопасности',
+        'Web-разработка',
+        'Контроль качества',
+        'DevOps',
+        'Маркетинг',
+        'Бухгалтерия',
+        'HR',
+        'Аналитика'
+    ];
+    i VARCHAR;
+BEGIN
+    FOREACH i IN ARRAY department_list
+    LOOP
+        CALL api.create_department(i);
+    END LOOP;
+END $$;
+
+
+-- Генерация данных об офисах
+DO $$
+DECLARE
+    random_num_number INT;
+    random_num_seats INT;
+    i INT;
+BEGIN
+    FOR i IN 1..100
+    LOOP
+        random_num_number := service.generate_num(100) * 3;
+        random_num_seats := service.generate_num(100) * 12;
+        CALL api.create_office(random_num_number, random_num_seats);
+    END LOOP;
+END $$;
+
+
+-- Генерация данных о должностях
+CALL api.create_role('Backend-разработчик', 100000.00);
+CALL api.create_role('Frontend-разработчик', 100000.00);
+CALL api.create_role('Разработчик баз данных', 120000.00);
+CALL api.create_role('Системный администратор', 170000.00);
+CALL api.create_role('DBA', 260000.00);
+CALL api.create_role('Team-lead DBA', 450000.00);
+CALL api.create_role('DevOps-инженер', 280000.00);
+CALL api.create_role('Старший DevOps-инженер', 400000.00);
+CALL api.create_role('HR', 100000.00);
+CALL api.create_role('Team-Lead HR', 150000.00);
+CALL api.create_role('Менеджер проектов', 200000.00);
+CALL api.create_role('Аналитик данных', 100000.00);
+CALL api.create_role('Data-инженер', 150000.00);
+CALL api.create_role('Маркетолог', 110000.00);
+CALL api.create_role('Специалист по информационной безопасности', 130000.00);
+CALL api.create_role('Тестировщик', 100000.00);
+
+
+CREATE OR REPLACE VIEW service.first_name_male AS
+SELECT first_name 
+FROM (SELECT UNNEST(array[
+    'Андрей', 'Александр', 'Алексей', 'Артем', 'Борис', 'Вадим', 
+    'Василий', 'Виктор', 'Геннадий', 'Георгий', 'Даниил', 
+    'Дмитрий', 'Евгений', 'Иван', 'Игорь', 'Илья', 'Константин', 
+    'Леонид', 'Максим', 'Михаил', 'Никита', 'Николай', 'Олег', 
+    'Павел', 'Петр', 'Роман', 'Сергей', 'Станислав', 'Тимофей', 
+    'Федор', 'Юрий', 'Яков', 'Ярослав', 'Артур', 'Владимир', 
+    'Григорий', 'Захар', 'Анатолий']) AS first_name) AS f
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.first_name_male
+IS 'Случайное мужское имя';
+
+
+CREATE OR REPLACE VIEW service.last_name_male AS
+SELECT last_name 
+FROM (SELECT UNNEST(array[
+    'Иванов', 'Петров', 'Сидоров', 'Смирнов', 'Кузнецов', 'Попов', 
+    'Васильев', 'Петров', 'Смирнов', 'Морозов', 'Новиков', 'Зайцев', 
+    'Борисов', 'Александров', 'Сергеев', 'Ковалев', 'Илларионов', 
+    'Григорьев', 'Романов', 'Федоров', 'Яковлев', 'Поляков', 'Соколов', 
+    'Макаров', 'Антонов', 'Крылов', 'Гаврилов', 'Ефимов', 'Фомин', 
+    'Дорофеев', 'Беляев', 'Никонов', 'Артемьев', 'Левин', 'Зуев', 
+    'Кондратьев', 'Андреев', 'Захаров']) AS last_name) AS l
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.last_name_male
+IS 'Случайная мужская фамилия';
+
+
+CREATE OR REPLACE VIEW service.middle_name_male AS
+SELECT middle_name 
+FROM (SELECT UNNEST(array[
+    'Иванович', 'Петрович', 'Васильевич', 'Алексеевич', 'Борисович', 'Александрович', 
+    'Сергеевич', 'Илларионович', 'Григорьевич', 'Романович', 'Федорович', 'Макарович', 
+    'Антонович', 'Ефимович', 'Андреевич', 'Захарович', NULL]) AS middle_name) AS m
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.middle_name_male
+IS 'Случайное мужское отчество';
+
+
+CREATE OR REPLACE VIEW service.first_name_female AS
+SELECT first_name 
+FROM (SELECT UNNEST(array[
+    'Анна', 'Виктория', 'Екатерина', 'Мария', 'Ольга', 'Татьяна', 
+    'Алиса', 'Дарья', 'Елена', 'Ирина', 'Ксения', 'Лариса', 
+    'Надежда', 'Полина', 'София', 'Юлия', 'Анжела', 'Валентина', 
+    'Евгения', 'Марина', 'Оксана', 'Тамара', 'Антонина', 'Валерия', 
+    'Ева', 'Кристина', 'Лилия', 'Нина', 'Раиса', 'Светлана', 
+    'Юлиана', 'Ангелина', 'Галина', 'Елена', 'Лидия', 'Милена', 
+    'Ольга', 'Таисия', 'Агата']) AS first_name) AS f
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.first_name_female
+IS 'Случайное женское имя';
+
+
+CREATE OR REPLACE VIEW service.last_name_female AS
+SELECT last_name 
+FROM (SELECT UNNEST(array[
+    'Иванова', 'Петрова', 'Сидорова', 'Смирнова', 'Кузнецова', 'Попова', 
+    'Васильева', 'Петрова', 'Смирнова', 'Морозова', 'Новикова', 'Зайцева', 
+    'Борисова', 'Александрова', 'Сергеева', 'Ковалева', 'Илларионова', 'Григорьева', 
+    'Романова', 'Федорова', 'Яковлева', 'Полякова', 'Соколова', 'Макарова', 
+    'Антонова', 'Крылова', 'Гаврилова', 'Ефимова', 'Фомина', 'Дорофеева', 
+    'Беляева', 'Никонова', 'Артемьева', 'Левина', 'Зуева', 'Кондратьева', 
+    'Андреева', 'Захарова']) AS last_name) AS l
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.last_name_female
+IS 'Случайная женская фамилия';
+
+
+CREATE OR REPLACE VIEW service.middle_name_female AS
+SELECT middle_name 
+FROM (SELECT UNNEST(array[
+    'Ивановна', 'Петровна', 'Васильевна', 'Алексеевна', 'Борисовна', 'Александровна', 
+    'Сергеевна', 'Илларионовна', 'Григорьевна', 'Романовна', 'Федоровна', 'Макаровна', 
+    'Антоновна', 'Ефимовна', 'Андреевна', 'Захаровна', NULL]) AS middle_name) AS m
+ORDER BY RANDOM()
+LIMIT 1;
+COMMENT ON VIEW service.middle_name_female
+IS 'Случайное женское отчество';
+
+
+CREATE OR REPLACE FUNCTION service.generate_date()
+RETURNS DATE AS $$
+DECLARE
+    start_date DATE := '1950-12-31';
+    end_date DATE := '2005-01-01';
+    random_days INTEGER;
+BEGIN
+    random_days := random() * (end_date - start_date) + 1;
+    RETURN start_date + random_days;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+COMMENT ON FUNCTION service.generate_date()
+IS 'Генерация случайной даты';
+
+
+CREATE OR REPLACE FUNCTION service.generate_numeric() 
+RETURNS NUMERIC(10, 2) AS $$
+DECLARE
+    varchar_num VARCHAR;
+BEGIN
+    varchar_num := (SELECT service.generate_num(90)) || '0000.00';
+    RETURN varchar_num::NUMERIC(10, 2);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+COMMENT ON FUNCTION service.generate_date()
+IS 'Генерация случайного числа типа NUMERIC(10, 2)';
+
+
+-- Генерация данных о сотрудниках
+DO $$
+DECLARE
+    loop_num INT := service.generate_num(1000);
+    random_boolean_value BOOLEAN;
+    i INT;
+BEGIN
+    FOR i IN 1..loop_num LOOP
+        random_boolean_value := (SELECT service.generate_boolean_value());
+        IF random_boolean_value = TRUE THEN
+            CALL api.create_employee(
+                (SELECT first_name FROM service.first_name_male),
+                (SELECT middle_name FROM service.middle_name_male),
+                (SELECT last_name FROM service.last_name_male),
+                (SELECT service.generate_date()),
+                (SELECT service.generate_numeric),
+                (SELECT service.generate_num(loop_num)),
+                (SELECT service.generate_num(8)),
+                (SELECT service.generate_num(100)),
+                (SELECT service.generate_num(16))
+            );
+        ELSIF random_boolean_value = FALSE THEN
+            CALL api.create_employee(
+                (SELECT first_name FROM service.first_name_female),
+                (SELECT middle_name FROM service.middle_name_female),
+                (SELECT last_name FROM service.last_name_female),
+                (SELECT service.generate_date()),
+                (SELECT service.generate_numeric),
+                (SELECT service.generate_num(loop_num)),
+                (SELECT service.generate_num(8)),
+                (SELECT service.generate_num(100)),
+                (SELECT service.generate_num(16))
+            );
+        END IF;
+    END LOOP;
+END $$;
