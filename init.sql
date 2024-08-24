@@ -6,12 +6,15 @@ CREATE DATABASE company;
 \connect company
 
 
-CREATE SCHEMA core;                     -- Основная модель данных
+--CREATE SCHEMA core;                     -- Основная модель данных
 CREATE SCHEMA api;                      -- API базы данных
 CREATE SCHEMA service;                  -- Служебный функционал, обеспечивающий целостность данных
 
 
-GRANT ALL PRIVILEGES ON DATABASE company TO testuser;
+GRANT USAGE ON SCHEMA api TO PUBLIC;
+GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA api TO PUBLIC;
+GRANT SELECT ON ALL TABLES IN SCHEMA api TO PUBLIC;
+
 
 --
 -- DATA MODELS
@@ -619,10 +622,18 @@ BEGIN
 
     WITH row_employees AS (
         SELECT id, ROW_NUMBER() OVER(PARTITION BY fk_office ORDER BY id) AS row_number
-        FROM core.employees
+        FROM api.get_employees
     )
-    UPDATE core.employees e
-    SET fk_boss = CASE WHEN re.row_number = 1 THEN NULL ELSE e.id END
+    UPDATE api.get_employees e
+    SET fk_boss = CASE 
+                    WHEN re.row_number = 1 THEN NULL
+                    WHEN re.row_number = 2 THEN e.id
+                ELSE (
+                    SELECT id 
+                    FROM row_employees re2 
+                    WHERE re2.row_number = 1 AND re2.id = e.fk_office
+                )
+                END
     FROM row_employees re
     WHERE e.id = re.id;
 END $$;

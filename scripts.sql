@@ -88,13 +88,30 @@ ORDER BY e_age;
 -- k. Список офисов, в которых есть еще свободные места
 -- i. + бонус = данный список отсортировать по убыванию количества мест 
 -- и соотв. вывести это количество вместе с вместимостью офиса
-/* SELECT o.number, o.seats, (o.seats + COUNT(e.id)) AS total_seats
+SELECT 
+    o.number, 
+    o.seats, 
+    (o.seats + COALESCE((SELECT COUNT(e.id) 
+                        FROM core.employees e 
+                        WHERE e.fk_office = o.id), 0)) AS capacity
 FROM api.get_offices o
-LEFT JOIN api.get_employees e ON o.id = e.fk_office
-GROUP BY o.id, o.number, o.seats
-ORDER BY o.seats DESC; */
+WHERE o.seats > 0
+ORDER BY o.seats DESC;
 
 
 -- l. Отделы и средняя ЗП среди сотрудников в них
+SELECT d.title, ROUND(AVG(e.salary), 2)::NUMERIC AS salary_employees
+FROM api.get_departments d
+LEFT JOIN api.get_employees e ON e.fk_department = d.id
+GROUP BY d.title;
+
+
 -- m. Список должностей, на которые еще никто не назначен
+SELECT title
+FROM api.get_roles
+WHERE id NOT IN (SELECT fk_role FROM api.get_employees);
+
+
 -- n. + бонус = вывести список сотрудников, отсортированный и пронумерованный в таком виде:
+
+--- --- --- --- ---
