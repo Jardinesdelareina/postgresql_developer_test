@@ -6,13 +6,12 @@ CREATE DATABASE company;
 \connect company
 
 
-CREATE SCHEMA core;
-CREATE SCHEMA api;
-CREATE SCHEMA service;
+CREATE SCHEMA core;                     -- Основная модель данных
+CREATE SCHEMA api;                      -- API базы данных
+CREATE SCHEMA service;                  -- Служебный функционал, обеспечивающий целостность данных
 
 
-GRANT USAGE ON SCHEMA api TO PUBLIC;
-
+GRANT ALL PRIVILEGES ON DATABASE company TO testuser;
 
 --
 -- DATA MODELS
@@ -32,7 +31,7 @@ CREATE TABLE core.offices
 (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     number INT NOT NULL,
-    seats INT NOT NULL
+    seats INT CHECK (seats >= 0) NOT NULL
 );
 COMMENT ON TABLE core.offices 
 IS 'Офисы';
@@ -278,7 +277,7 @@ IS 'Подробная информация об отделах';
 
 
 CREATE OR REPLACE VIEW api.get_offices AS
-SELECT number, seats FROM core.offices;
+SELECT id, number, seats FROM core.offices;
 COMMENT ON VIEW api.get_offices 
 IS 'Подробная информация об офисах';
 
@@ -314,7 +313,7 @@ IS 'Подробная информация об сотрудниках';
 CREATE OR REPLACE FUNCTION service.set_default_salary()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF salary IS NULL THEN
+    IF NEW.salary IS NULL THEN
         SELECT salary INTO NEW.salary
         FROM core.roles
         WHERE id = NEW.fk_role;
@@ -331,24 +330,46 @@ COMMENT ON TRIGGER trg_set_default_salary ON core.employees
 IS 'Установка сотруднику зарплаты по-умолчанию согласно должности';
 
 
-CREATE OR REPLACE FUNCTION service.set_remote_work()
+CREATE OR REPLACE FUNCTION service.decrement_seats()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF (SELECT seats FROM core.offices WHERE number = NEW.fk_office) <= (
-        SELECT COUNT(id) FROM core.employees WHERE fk_office = NEW.fk_office
-    ) THEN
-        NEW.fk_office = NULL;
+    IF (SELECT seats FROM core.offices WHERE id = NEW.fk_office) > 0 THEN
+        UPDATE core.offices
+        SET seats = seats - 1
+        WHERE id = NEW.fk_office;
+    ELSE
+        UPDATE core.employees
+        SET fk_office = NULL
+        WHERE fk_office = NEW.fk_office;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_set_remote_work
-BEFORE INSERT ON core.employees
+CREATE TRIGGER trg_decrement_seats
+AFTER INSERT ON core.employees
 FOR EACH ROW
-EXECUTE FUNCTION service.set_remote_work();
-COMMENT ON TRIGGER trg_set_default_salary ON core.employees
-IS 'Проверка наличия свободных мест в офисе при добавлении сотрудника';
+EXECUTE FUNCTION service.decrement_seats();
+COMMENT ON TRIGGER trg_decrement_seats ON core.employees
+IS 'Уменьшение количества мест в офисе при добавлении нового сотрудника';
+
+
+CREATE OR REPLACE FUNCTION service.increment_seats()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE core.offices
+    SET seats = seats + 1
+    WHERE id = OLD.fk_office;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_increment_seats
+AFTER DELETE ON core.employees
+FOR EACH ROW
+EXECUTE FUNCTION service.increment_seats();
+COMMENT ON TRIGGER trg_increment_seats ON core.employees
+IS 'Увеличение количества мест в офисе при добавлении нового сотрудника';
 
 
 --
@@ -358,14 +379,14 @@ IS 'Проверка наличия свободных мест в офисе п
 
 CREATE OR REPLACE FUNCTION service.generate_num(limit_num INT) RETURNS INT AS $$
     SELECT FLOOR(RANDOM() * limit_num) + 1;
-$$ LANGUAGE sql IMMUTABLE;
+$$ LANGUAGE sql;
 COMMENT ON FUNCTION service.generate_num(INT)
 IS 'Генерация случайного целого числа';
 
 
 CREATE OR REPLACE FUNCTION service.generate_boolean_value() RETURNS BOOLEAN AS $$
     SELECT CASE WHEN random() < 0.5 THEN TRUE ELSE FALSE END;
-$$ LANGUAGE sql IMMUTABLE;
+$$ LANGUAGE sql;
 COMMENT ON FUNCTION service.generate_boolean_value()
 IS 'Генерация булевого значения';
 
@@ -401,8 +422,12 @@ DECLARE
 BEGIN
     FOR i IN 1..100
     LOOP
-        random_num_number := service.generate_num(100) * 3;
-        random_num_seats := service.generate_num(100) * 12;
+        IF i = 1 THEN
+            random_num_number := 4;
+        ELSE
+            random_num_number := service.generate_num(100);
+        END IF;
+        random_num_seats := service.generate_num(100);
         CALL api.create_office(random_num_number, random_num_seats);
     END LOOP;
 END $$;
@@ -425,6 +450,8 @@ CALL api.create_role('Data-инженер', 150000.00);
 CALL api.create_role('Маркетолог', 110000.00);
 CALL api.create_role('Специалист по информационной безопасности', 130000.00);
 CALL api.create_role('Тестировщик', 100000.00);
+CALL api.create_role('CTO', 900000.00);
+
 
 
 CREATE OR REPLACE VIEW service.first_name_male AS
@@ -522,10 +549,10 @@ DECLARE
     end_date DATE := '2005-01-01';
     random_days INTEGER;
 BEGIN
-    random_days := random() * (end_date - start_date) + 1;
+    random_days := RANDOM() * (end_date - start_date) + 1;
     RETURN start_date + random_days;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION service.generate_date()
 IS 'Генерация случайной даты';
 
@@ -538,7 +565,7 @@ BEGIN
     varchar_num := (SELECT service.generate_num(90)) || '0000.00';
     RETURN varchar_num::NUMERIC(10, 2);
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION service.generate_date()
 IS 'Генерация случайного числа типа NUMERIC(10, 2)';
 
@@ -546,36 +573,56 @@ IS 'Генерация случайного числа типа NUMERIC(10, 2)';
 -- Генерация данных о сотрудниках
 DO $$
 DECLARE
-    loop_num INT := service.generate_num(1000);
     random_boolean_value BOOLEAN;
     i INT;
+    first_name_value VARCHAR(50);
+    middle_name_value VARCHAR(50);
+    last_name_value VARCHAR(50);
+    random_date_value DATE;
+    random_numeric_value NUMERIC(10, 2);
+    random_boss_value INT;
+    random_department_value INT;
+    random_office_value INT;
+    random_role_value INT;
 BEGIN
-    FOR i IN 1..loop_num LOOP
+    FOR i IN 1..1000 LOOP
         random_boolean_value := (SELECT service.generate_boolean_value());
         IF random_boolean_value = TRUE THEN
-            CALL api.create_employee(
-                (SELECT first_name FROM service.first_name_male),
-                (SELECT middle_name FROM service.middle_name_male),
-                (SELECT last_name FROM service.last_name_male),
-                (SELECT service.generate_date()),
-                (SELECT service.generate_numeric),
-                (SELECT service.generate_num(loop_num)),
-                (SELECT service.generate_num(8)),
-                (SELECT service.generate_num(100)),
-                (SELECT service.generate_num(16))
-            );
-        ELSIF random_boolean_value = FALSE THEN
-            CALL api.create_employee(
-                (SELECT first_name FROM service.first_name_female),
-                (SELECT middle_name FROM service.middle_name_female),
-                (SELECT last_name FROM service.last_name_female),
-                (SELECT service.generate_date()),
-                (SELECT service.generate_numeric),
-                (SELECT service.generate_num(loop_num)),
-                (SELECT service.generate_num(8)),
-                (SELECT service.generate_num(100)),
-                (SELECT service.generate_num(16))
-            );
+            first_name_value := (SELECT first_name FROM service.first_name_male);
+            middle_name_value := (SELECT middle_name FROM service.middle_name_male);
+            last_name_value := (SELECT last_name FROM service.last_name_male);
+        ELSE
+            first_name_value := (SELECT first_name FROM service.first_name_female);
+            middle_name_value := (SELECT middle_name FROM service.middle_name_female);
+            last_name_value := (SELECT last_name FROM service.last_name_female);
         END IF;
+        random_date_value := (SELECT service.generate_date());
+        random_numeric_value := (
+            SELECT CASE WHEN random_boolean_value = TRUE THEN service.generate_numeric() ELSE NULL END
+        );
+        random_boss_value := NULL;
+        random_department_value := (SELECT service.generate_num(8));
+        random_office_value := (SELECT service.generate_num(100));
+        random_role_value := (SELECT service.generate_num(16));
+        CALL api.create_employee(
+            first_name_value,
+            last_name_value,
+            middle_name_value,
+            random_date_value,
+            random_numeric_value,
+            random_boss_value,
+            random_department_value,
+            random_office_value,
+            random_role_value
+        );
     END LOOP;
+
+    WITH row_employees AS (
+        SELECT id, ROW_NUMBER() OVER(PARTITION BY fk_office ORDER BY id) AS row_number
+        FROM core.employees
+    )
+    UPDATE core.employees e
+    SET fk_boss = CASE WHEN re.row_number = 1 THEN NULL ELSE e.id END
+    FROM row_employees re
+    WHERE e.id = re.id;
 END $$;
