@@ -11,11 +11,6 @@ CREATE SCHEMA api;                      -- API базы данных
 CREATE SCHEMA service;                  -- Служебный функционал, обеспечивающий целостность данных
 
 
-GRANT USAGE ON SCHEMA api TO PUBLIC;
-GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA api TO PUBLIC;
-GRANT SELECT ON ALL TABLES IN SCHEMA api TO PUBLIC;
-
-
 --
 -- DATA MODELS
 --
@@ -625,3 +620,8 @@ BEGIN
     FROM row_employees re
     WHERE e.id = re.id;
 END $$;
+
+
+GRANT USAGE ON SCHEMA api TO PUBLIC;
+GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA api TO PUBLIC;
+GRANT SELECT ON ALL TABLES IN SCHEMA api TO PUBLIC;
