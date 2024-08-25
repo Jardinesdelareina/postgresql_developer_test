@@ -1,5 +1,5 @@
 -- a. Сотрудники, которых приняли на работу, но не выделили им рабочее место (работают удаленно)
-SELECT CONCAT_WS(' ', first_name, middle_name, last_name) AS employees, 
+SELECT CONCAT_WS(' ', first_name, middle_name, last_name) AS employees
 FROM api.get_employees
 WHERE fk_office IS NULL;
 

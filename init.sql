@@ -24,7 +24,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA api TO PUBLIC;
 CREATE TABLE core.departments
 (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    title VARCHAR(200)
+    title VARCHAR(200) NOT NULL
 );
 COMMENT ON TABLE core.departments
 IS 'Отделы';
@@ -314,11 +314,14 @@ IS 'Установка сотруднику зарплаты по-умолчан
 CREATE OR REPLACE FUNCTION service.decrement_seats()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Если количество мест в офисе больше нуля
     IF (SELECT seats FROM core.offices WHERE id = NEW.fk_office) > 0 THEN
+        -- уменьшить на 1
         UPDATE core.offices
         SET seats = seats - 1
         WHERE id = NEW.fk_office;
     ELSE
+        -- Иначе - офис у сотрудника будет отсутствовать (удаленка)
         UPDATE core.employees
         SET fk_office = NULL
         WHERE fk_office = NEW.fk_office;
@@ -359,6 +362,8 @@ IS 'Увеличение количества мест в офисе при до
 
 
 CREATE OR REPLACE FUNCTION service.generate_num(limit_num INT) RETURNS INT AS $$
+    -- Рандом выводит длинное десятичное число, оно умножается на значение параметра
+    -- затем все округляется в меньшую сторону доближайшего целого числа
     SELECT FLOOR(RANDOM() * limit_num) + 1;
 $$ LANGUAGE sql;
 COMMENT ON FUNCTION service.generate_num(INT)
@@ -366,7 +371,7 @@ IS 'Генерация случайного целого числа';
 
 
 CREATE OR REPLACE FUNCTION service.generate_boolean_value() RETURNS BOOLEAN AS $$
-    SELECT CASE WHEN random() < 0.5 THEN TRUE ELSE FALSE END;
+    SELECT CASE WHEN RANDOM() < 0.5 THEN TRUE ELSE FALSE END;
 $$ LANGUAGE sql;
 COMMENT ON FUNCTION service.generate_boolean_value()
 IS 'Генерация булевого значения';
@@ -403,6 +408,9 @@ DECLARE
 BEGIN
     FOR i IN 1..100
     LOOP
+        -- Номер офиса 4 фигурирует в тестовом задании, но нет гарантии, что функция генерации 
+        -- чисел в очередной выборке создаст офис с таким номером, 
+        -- поэтому офис №4 создается в первую очередь
         IF i = 1 THEN
             random_num_number := 4;
         ELSE
@@ -511,6 +519,7 @@ COMMENT ON VIEW service.last_name_female
 IS 'Случайная женская фамилия';
 
 
+-- NULL добавлен в список с целью демонстрации отсутствия ограничения NOT NULL в middle_name
 CREATE OR REPLACE VIEW service.middle_name_female AS
 SELECT middle_name 
 FROM (SELECT UNNEST(array[
@@ -598,6 +607,7 @@ BEGIN
         );
     END LOOP;
 
+    -- Создание в employees древовидной структуры иерархии начальства
     WITH row_employees AS (
         SELECT id, ROW_NUMBER() OVER(PARTITION BY fk_office ORDER BY id) AS row_number
         FROM core.employees
