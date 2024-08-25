@@ -4,7 +4,7 @@
 Концептуальная и физическая модели данных представлены в виде Entity-Relation диаграммы и, непосредственно, реализации данной архитектуры в DDL, описанном в файле `init.sql`. 
 
 <div>
-    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/erd.png" width="1000" height="700"/>&nbsp;
+    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/erd.png" width="600" height="400"/>&nbsp;
 </div>
 
 <b>Отделы (departments)</b>
@@ -66,7 +66,7 @@
 ### 2. Бизнес-процесс в нотации BPMN 2.0
 
 <div>
-    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/bpmn.png" width="1000" height="700"/>&nbsp;
+    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/bpmn.png" width="600" height="400"/>&nbsp;
 </div>
 
 
