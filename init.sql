@@ -6,7 +6,7 @@ CREATE DATABASE company;
 \connect company
 
 
---CREATE SCHEMA core;                     -- Основная модель данных
+CREATE SCHEMA core;                     -- Основная модель данных
 CREATE SCHEMA api;                      -- API базы данных
 CREATE SCHEMA service;                  -- Служебный функционал, обеспечивающий целостность данных
 
@@ -119,12 +119,12 @@ IS 'Добавление офиса';
 
 CREATE OR REPLACE PROCEDURE api.update_office(
     input_id INT,
-    input_number INT DEFAULT NULL,
-    input_seats INT DEFAULT NULL
+    input_number INT,
+    input_seats INT
     ) AS $$
     UPDATE core.offices
-    SET number = COALESCE(input_number, number), 
-        seats = COALESCE(input_seats, seats)
+    SET number = input_number, 
+        seats = input_seats
     WHERE id = input_id;
 $$ LANGUAGE sql;
 COMMENT ON PROCEDURE api.update_office(INT, INT, INT) 
@@ -153,13 +153,6 @@ COMMENT ON PROCEDURE api.create_role(VARCHAR(300), NUMERIC(10, 2))
 IS 'Добавление должности';
 
 
-/* 
-Пример использования: 
-CALL core.update_role(1, 'New Title', NULL);
-В параметры процедуры вводится id должности и параметр, 
-который нужно изменить (уже измененный вариант). 
-Для неизменного параметра нужно ввести NULL. Можно ввести для изменения оба параметра.
-*/
 CREATE OR REPLACE PROCEDURE api.update_role(
     input_id INT,
     input_title VARCHAR(300) DEFAULT NULL,
@@ -168,11 +161,9 @@ CREATE OR REPLACE PROCEDURE api.update_role(
 BEGIN
     IF input_title IS NOT NULL OR input_salary IS NOT NULL THEN
         UPDATE core.roles 
-        SET title = COALESCE(input_title, title),
-            salary = COALESCE(input_salary, salary) 
+        SET title = input_title,
+            salary = input_salary 
         WHERE id = input_id;
-    ELSE
-        RAISE EXCEPTION 'Необходимо указать хотя бы один параметр (должность или зарплата)';
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -215,41 +206,28 @@ COMMENT ON PROCEDURE api.create_employee(
 
 CREATE OR REPLACE PROCEDURE api.update_employee(
     input_id INT,
-    iinput_first_name VARCHAR(50) DEFAULT NULL,
-    input_last_name VARCHAR(50) DEFAULT NULL,
-    input_middle_name VARCHAR(50) DEFAULT NULL,
-    input_date_of_birdth DATE DEFAULT NULL,
-    input_salary NUMERIC(10, 2) DEFAULT NULL,
-    input_boss INT DEFAULT NULL,
-    input_department INT DEFAULT NULL,
-    input_office INT DEFAULT NULL,
-    input_role INT DEFAULT NULL
+    input_first_name VARCHAR(50),
+    input_last_name VARCHAR(50),
+    input_middle_name VARCHAR(50),
+    input_date_of_birdth DATE,
+    input_salary NUMERIC(10, 2),
+    input_boss INT,
+    input_department INT,
+    input_office INT,
+    input_role INT
     ) AS $$
 BEGIN
-    IF input_first_name IS NOT NULL 
-    OR input_last_name IS NOT NULL 
-    OR input_middle_name IS NOT NULL
-    OR input_date_of_birdth IS NOT NULL
-    OR input_salary IS NOT NULL
-    OR input_boss IS NOT NULL
-    OR input_department IS NOT NULL
-    OR input_office IS NOT NULL
-    OR input_role IS NOT NULL
-    THEN
-        UPDATE core.roles 
-        SET first_name = COALESCE(input_first_name, first_name),
-            last_name = COALESCE(input_last_name, last_name),
-            middle_name = COALESCE(input_middle_name, middle_name),
-            date_of_birdth = COALESCE(input_date_of_birdth, date_of_birdth),
-            salary = COALESCE(input_salary, salary),
-            fk_boss = COALESCE(input_boss, fk_boss),
-            fk_department = COALESCE(input_department, fk_department),
-            fk_office = COALESCE(input_office, fk_office),
-            fk_role =COALESCE(input_role, fk_role)
-        WHERE id = input_id;
-    ELSE
-        RAISE EXCEPTION 'Необходимо указать хотя бы один параметр (должность или зарплата)';
-    END IF;
+    UPDATE core.employees 
+    SET first_name = input_first_name,
+        last_name = input_last_name,
+        middle_name = input_middle_name,
+        date_of_birdth = input_date_of_birdth,
+        salary = input_salary,
+        fk_boss = input_boss,
+        fk_department = input_department,
+        fk_office = input_office,
+        fk_role = input_role
+    WHERE id = input_id;
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON PROCEDURE api.update_employee(
@@ -459,7 +437,7 @@ CALL api.create_role('CTO', 900000.00);
 
 CREATE OR REPLACE VIEW service.first_name_male AS
 SELECT first_name 
-FROM (SELECT UNNEST(array[
+FROM (SELECT UNNEST(ARRAY[
     'Андрей', 'Александр', 'Алексей', 'Артем', 'Борис', 'Вадим', 
     'Василий', 'Виктор', 'Геннадий', 'Георгий', 'Даниил', 
     'Дмитрий', 'Евгений', 'Иван', 'Игорь', 'Илья', 'Константин', 
@@ -475,7 +453,7 @@ IS 'Случайное мужское имя';
 
 CREATE OR REPLACE VIEW service.last_name_male AS
 SELECT last_name 
-FROM (SELECT UNNEST(array[
+FROM (SELECT UNNEST(ARRAY[
     'Иванов', 'Петров', 'Сидоров', 'Смирнов', 'Кузнецов', 'Попов', 
     'Васильев', 'Петров', 'Смирнов', 'Морозов', 'Новиков', 'Зайцев', 
     'Борисов', 'Александров', 'Сергеев', 'Ковалев', 'Илларионов', 
@@ -491,7 +469,7 @@ IS 'Случайная мужская фамилия';
 
 CREATE OR REPLACE VIEW service.middle_name_male AS
 SELECT middle_name 
-FROM (SELECT UNNEST(array[
+FROM (SELECT UNNEST(ARRAY[
     'Иванович', 'Петрович', 'Васильевич', 'Алексеевич', 'Борисович', 'Александрович', 
     'Сергеевич', 'Илларионович', 'Григорьевич', 'Романович', 'Федорович', 'Макарович', 
     'Антонович', 'Ефимович', 'Андреевич', 'Захарович', NULL]) AS middle_name) AS m
@@ -503,7 +481,7 @@ IS 'Случайное мужское отчество';
 
 CREATE OR REPLACE VIEW service.first_name_female AS
 SELECT first_name 
-FROM (SELECT UNNEST(array[
+FROM (SELECT UNNEST(ARRAY[
     'Анна', 'Виктория', 'Екатерина', 'Мария', 'Ольга', 'Татьяна', 
     'Алиса', 'Дарья', 'Елена', 'Ирина', 'Ксения', 'Лариса', 
     'Надежда', 'Полина', 'София', 'Юлия', 'Анжела', 'Валентина', 
@@ -519,7 +497,7 @@ IS 'Случайное женское имя';
 
 CREATE OR REPLACE VIEW service.last_name_female AS
 SELECT last_name 
-FROM (SELECT UNNEST(array[
+FROM (SELECT UNNEST(ARRAY[
     'Иванова', 'Петрова', 'Сидорова', 'Смирнова', 'Кузнецова', 'Попова', 
     'Васильева', 'Петрова', 'Смирнова', 'Морозова', 'Новикова', 'Зайцева', 
     'Борисова', 'Александрова', 'Сергеева', 'Ковалева', 'Илларионова', 'Григорьева', 
@@ -622,9 +600,9 @@ BEGIN
 
     WITH row_employees AS (
         SELECT id, ROW_NUMBER() OVER(PARTITION BY fk_office ORDER BY id) AS row_number
-        FROM api.get_employees
+        FROM core.employees
     )
-    UPDATE api.get_employees e
+    UPDATE core.employees e
     SET fk_boss = CASE 
                     WHEN re.row_number = 1 THEN NULL
                     WHEN re.row_number = 2 THEN e.id
