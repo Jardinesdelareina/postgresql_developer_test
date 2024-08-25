@@ -66,7 +66,7 @@
 ### 2. Бизнес-процесс в нотации BPMN 2.0
 
 <div>
-    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/bpmn.png" width="600" height="400"/>&nbsp;
+    <img src="https://github.com/Jardinesdelareina/postgresql_developer_test/blob/main/bpmn.png" width="800" height="400"/>&nbsp;
 </div>
 
 
